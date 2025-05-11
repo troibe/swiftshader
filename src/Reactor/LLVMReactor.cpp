@@ -2025,6 +2025,8 @@ RValue<Short4> operator<<(RValue<Short4> lhs, unsigned char rhs)
 	//	return RValue<Short4>(Nucleus::createShl(lhs.value(), rhs.value()));
 
 	return x86::psllw(lhs, rhs);
+#elif defined(__riscv_vector)
+	return riscv64::psllw(lhs, rhs);
 #else
 	return As<Short4>(V(lowerVectorShl(V(lhs.value()), rhs)));
 #endif
@@ -2035,6 +2037,8 @@ RValue<Short4> operator>>(RValue<Short4> lhs, unsigned char rhs)
 	RR_DEBUG_INFO_UPDATE_LOC();
 #if defined(__i386__) || defined(__x86_64__)
 	return x86::psraw(lhs, rhs);
+#elif defined(__riscv_vector)
+	return riscv64::psraw(lhs, rhs);
 #else
 	return As<Short4>(V(lowerVectorAShr(V(lhs.value()), rhs)));
 #endif
@@ -2179,6 +2183,8 @@ RValue<UShort4> operator<<(RValue<UShort4> lhs, unsigned char rhs)
 	//	return RValue<Short4>(Nucleus::createShl(lhs.value(), rhs.value()));
 
 	return As<UShort4>(x86::psllw(As<Short4>(lhs), rhs));
+#elif defined(__riscv_vector)
+	return As<UShort4>(riscv64::psllw(As<Short4>(lhs), rhs));
 #else
 	return As<UShort4>(V(lowerVectorShl(V(lhs.value()), rhs)));
 #endif
@@ -2191,6 +2197,8 @@ RValue<UShort4> operator>>(RValue<UShort4> lhs, unsigned char rhs)
 	//	return RValue<Short4>(Nucleus::createLShr(lhs.value(), rhs.value()));
 
 	return x86::psrlw(lhs, rhs);
+#elif defined(__riscv_vector)
+	return riscv64::psrlw(lhs, rhs);
 #else
 	return As<UShort4>(V(lowerVectorLShr(V(lhs.value()), rhs)));
 #endif
@@ -2260,6 +2268,8 @@ RValue<Short8> operator<<(RValue<Short8> lhs, unsigned char rhs)
 	RR_DEBUG_INFO_UPDATE_LOC();
 #if defined(__i386__) || defined(__x86_64__)
 	return x86::psllw(lhs, rhs);
+#elif defined(__riscv_vector)
+	return riscv64::psllw(lhs, rhs);
 #else
 	return As<Short8>(V(lowerVectorShl(V(lhs.value()), rhs)));
 #endif
@@ -2270,6 +2280,8 @@ RValue<Short8> operator>>(RValue<Short8> lhs, unsigned char rhs)
 	RR_DEBUG_INFO_UPDATE_LOC();
 #if defined(__i386__) || defined(__x86_64__)
 	return x86::psraw(lhs, rhs);
+#elif defined(__riscv_vector)
+	return riscv64::psraw(lhs, rhs);
 #else
 	return As<Short8>(V(lowerVectorAShr(V(lhs.value()), rhs)));
 #endif
@@ -2307,6 +2319,8 @@ RValue<UShort8> operator<<(RValue<UShort8> lhs, unsigned char rhs)
 	RR_DEBUG_INFO_UPDATE_LOC();
 #if defined(__i386__) || defined(__x86_64__)
 	return As<UShort8>(x86::psllw(As<Short8>(lhs), rhs));
+#elif defined(__riscv_vector)
+	return As<UShort8>(riscv64::psllw(As<Short8>(lhs), rhs));
 #else
 	return As<UShort8>(V(lowerVectorShl(V(lhs.value()), rhs)));
 #endif
@@ -2317,6 +2331,8 @@ RValue<UShort8> operator>>(RValue<UShort8> lhs, unsigned char rhs)
 	RR_DEBUG_INFO_UPDATE_LOC();
 #if defined(__i386__) || defined(__x86_64__)
 	return x86::psrlw(lhs, rhs);  // FIXME: Fallback required
+#elif defined(__riscv_vector)
+	return riscv64::psrlw(lhs, rhs);  // FIXME: Fallback required as well?
 #else
 	return As<UShort8>(V(lowerVectorLShr(V(lhs.value()), rhs)));
 #endif
@@ -2478,6 +2494,8 @@ RValue<Int2> operator<<(RValue<Int2> lhs, unsigned char rhs)
 	//	return RValue<Int2>(Nucleus::createShl(lhs.value(), rhs.value()));
 
 	return x86::pslld(lhs, rhs);
+#elif defined(__riscv_vector)
+	return riscv64::pslld(lhs, rhs);
 #else
 	return As<Int2>(V(lowerVectorShl(V(lhs.value()), rhs)));
 #endif
@@ -2490,6 +2508,8 @@ RValue<Int2> operator>>(RValue<Int2> lhs, unsigned char rhs)
 	//	return RValue<Int2>(Nucleus::createAShr(lhs.value(), rhs.value()));
 
 	return x86::psrad(lhs, rhs);
+#elif defined(__riscv_vector)
+	return riscv64::psrad(lhs, rhs);
 #else
 	return As<Int2>(V(lowerVectorAShr(V(lhs.value()), rhs)));
 #endif
@@ -2507,6 +2527,8 @@ RValue<UInt2> operator<<(RValue<UInt2> lhs, unsigned char rhs)
 	//	return RValue<UInt2>(Nucleus::createShl(lhs.value(), rhs.value()));
 
 	return As<UInt2>(x86::pslld(As<Int2>(lhs), rhs));
+#elif defined(__riscv_vector)
+	return As<UInt2>(riscv64::pslld(As<Int2>(lhs), rhs));
 #else
 	return As<UInt2>(V(lowerVectorShl(V(lhs.value()), rhs)));
 #endif
@@ -2519,6 +2541,8 @@ RValue<UInt2> operator>>(RValue<UInt2> lhs, unsigned char rhs)
 	//	return RValue<UInt2>(Nucleus::createLShr(lhs.value(), rhs.value()));
 
 	return x86::psrld(lhs, rhs);
+#elif defined(__riscv_vector)
+	return riscv64::psrld(lhs, rhs);
 #else
 	return As<UInt2>(V(lowerVectorLShr(V(lhs.value()), rhs)));
 #endif
@@ -2595,6 +2619,8 @@ RValue<Int4> operator<<(RValue<Int4> lhs, unsigned char rhs)
 	RR_DEBUG_INFO_UPDATE_LOC();
 #if defined(__i386__) || defined(__x86_64__)
 	return x86::pslld(lhs, rhs);
+#elif defined(__riscv_vector)
+	return riscv64::pslld(lhs, rhs);
 #else
 	return As<Int4>(V(lowerVectorShl(V(lhs.value()), rhs)));
 #endif
@@ -2605,6 +2631,8 @@ RValue<Int4> operator>>(RValue<Int4> lhs, unsigned char rhs)
 	RR_DEBUG_INFO_UPDATE_LOC();
 #if defined(__i386__) || defined(__x86_64__)
 	return x86::psrad(lhs, rhs);
+#elif defined(__riscv_vector)
+	return riscv64::psrad(lhs, rhs);
 #else
 	return As<Int4>(V(lowerVectorAShr(V(lhs.value()), rhs)));
 #endif
@@ -2799,6 +2827,8 @@ RValue<UInt4> operator<<(RValue<UInt4> lhs, unsigned char rhs)
 	RR_DEBUG_INFO_UPDATE_LOC();
 #if defined(__i386__) || defined(__x86_64__)
 	return As<UInt4>(x86::pslld(As<Int4>(lhs), rhs));
+#elif defined(__riscv_vector)
+	return As<UInt4>(riscv64::pslld(As<Int4>(lhs), rhs));
 #else
 	return As<UInt4>(V(lowerVectorShl(V(lhs.value()), rhs)));
 #endif
@@ -2809,6 +2839,8 @@ RValue<UInt4> operator>>(RValue<UInt4> lhs, unsigned char rhs)
 	RR_DEBUG_INFO_UPDATE_LOC();
 #if defined(__i386__) || defined(__x86_64__)
 	return x86::psrld(lhs, rhs);
+#elif defined(__riscv_vector)
+	return riscv64::psrld(lhs, rhs);
 #else
 	return As<UInt4>(V(lowerVectorLShr(V(lhs.value()), rhs)));
 #endif
@@ -3440,7 +3472,7 @@ namespace riscv64 {
 static Value *createInstruction(llvm::Intrinsic::ID id, Value *x, Value *y, int size)
 {
 	auto i = llvm::ConstantInt::get(*jit->context, llvm::APInt(64, size));
-	auto e = llvm::ConstantInt::get(*jit->context, llvm::APInt(64, 1));  // SEW 32bit
+	auto e = llvm::ConstantInt::get(*jit->context, llvm::APInt(64, 1));  // SEW 16bit
 	auto m = llvm::ConstantInt::get(*jit->context, llvm::APInt(64, 0));  // LMUL 1
 	llvm::Function *FnVsetli = llvm::Intrinsic::getDeclaration(jit->module.get(), llvm::Intrinsic::riscv_vsetvli, { i->getType(), e->getType(), m->getType() });
 	llvm::Value *Vl = jit->builder->CreateCall(FnVsetli->getFunctionType(), FnVsetli, { i, e, m });
@@ -3487,6 +3519,29 @@ static Value *createInstructionFloat(llvm::Intrinsic::ID id, Value *x, Value *y,
 	return V(FixedVector);
 }
 
+static Value *createInstructionImmediate(llvm::Intrinsic::ID id, Value *x, unsigned char y, int size, int sew)
+{
+	auto i = llvm::ConstantInt::get(*jit->context, llvm::APInt(64, size));
+	auto e = llvm::ConstantInt::get(*jit->context, llvm::APInt(64, sew));  // SEW 16bit
+	auto m = llvm::ConstantInt::get(*jit->context, llvm::APInt(64, 0));    // LMUL 1
+	llvm::Function *FnVsetli = llvm::Intrinsic::getDeclaration(jit->module.get(), llvm::Intrinsic::riscv_vsetvli, { i->getType(), e->getType(), m->getType() });
+	llvm::Value *Vl = jit->builder->CreateCall(FnVsetli->getFunctionType(), FnVsetli, { i, e, m });
+
+	auto SVTy = llvm::ScalableVectorType::get(llvm::IntegerType::get(*jit->context, sew * 16), size);
+	llvm::Value *X = llvm::PoisonValue::get(SVTy);
+	auto Idx = llvm::ConstantInt::get(*jit->context, llvm::APInt(64, 0));
+	X = jit->builder->CreateInsertVector(SVTy, X, V(x), Idx);
+
+	llvm::Value *R = llvm::PoisonValue::get(SVTy);
+	llvm::Value *Y = llvm::ConstantInt::get(*jit->context, llvm::APInt(64, y));
+	llvm::Function *FnVmulh = llvm::Intrinsic::getDeclaration(jit->module.get(), id, { R->getType(), X->getType(), Y->getType(), Vl->getType() });
+	R = jit->builder->CreateCall(FnVmulh->getFunctionType(), FnVmulh, { R, X, Y, Vl });
+
+	auto VTy = llvm::FixedVectorType::get(llvm::IntegerType::get(*jit->context, sew * 16), size);
+	auto FixedVector = jit->builder->CreateExtractVector(VTy, R, Idx);
+	return V(FixedVector);
+}
+
 RValue<Short4> pmulhw(RValue<Short4> x, RValue<Short4> y)
 {
 	return As<Short4>(createInstruction(llvm::Intrinsic::riscv_vmulh, x.value(), y.value(), 4));
@@ -3515,6 +3570,66 @@ RValue<Float4> maxps(RValue<Float4> x, RValue<Float4> y)
 RValue<Float4> minps(RValue<Float4> x, RValue<Float4> y)
 {
 	return RValue<Float4>(createInstructionFloat(llvm::Intrinsic::riscv_vfmin, x.value(), y.value(), 4));
+}
+
+RValue<UShort4> psrlw(RValue<UShort4> x, unsigned char y)
+{
+	return As<UShort4>(createInstructionImmediate(llvm::Intrinsic::riscv_vsrl, x.value(), y, 4, 1));
+}
+
+RValue<UShort8> psrlw(RValue<UShort8> x, unsigned char y)
+{
+	return RValue<UShort8>(createInstructionImmediate(llvm::Intrinsic::riscv_vsrl, x.value(), y, 8, 1));
+}
+
+RValue<UInt2> psrld(RValue<UInt2> x, unsigned char y)
+{
+	return As<UInt2>(createInstructionImmediate(llvm::Intrinsic::riscv_vsrl, x.value(), y, 2, 2));
+}
+
+RValue<UInt4> psrld(RValue<UInt4> x, unsigned char y)
+{
+	return RValue<UInt4>(createInstructionImmediate(llvm::Intrinsic::riscv_vsrl, x.value(), y, 4, 2));
+}
+
+RValue<Short4> psraw(RValue<Short4> x, unsigned char y)
+{
+	return As<Short4>(createInstructionImmediate(llvm::Intrinsic::riscv_vsra, x.value(), y, 4, 1));
+}
+
+RValue<Short8> psraw(RValue<Short8> x, unsigned char y)
+{
+	return RValue<Short8>(createInstructionImmediate(llvm::Intrinsic::riscv_vsra, x.value(), y, 8, 1));
+}
+
+RValue<Int2> psrad(RValue<Int2> x, unsigned char y)
+{
+	return As<Int2>(createInstructionImmediate(llvm::Intrinsic::riscv_vsra, x.value(), y, 2, 2));
+}
+
+RValue<Int4> psrad(RValue<Int4> x, unsigned char y)
+{
+	return RValue<Int4>(createInstructionImmediate(llvm::Intrinsic::riscv_vsra, x.value(), y, 4, 2));
+}
+
+RValue<Short4> psllw(RValue<Short4> x, unsigned char y)
+{
+	return As<Short4>(createInstructionImmediate(llvm::Intrinsic::riscv_vsll, x.value(), y, 4, 1));
+}
+
+RValue<Short8> psllw(RValue<Short8> x, unsigned char y)
+{
+	return RValue<Short8>(createInstructionImmediate(llvm::Intrinsic::riscv_vsll, x.value(), y, 8, 1));
+}
+
+RValue<Int2> pslld(RValue<Int2> x, unsigned char y)
+{
+	return As<Int2>(createInstructionImmediate(llvm::Intrinsic::riscv_vsll, x.value(), y, 2, 2));
+}
+
+RValue<Int4> pslld(RValue<Int4> x, unsigned char y)
+{
+	return RValue<Int4>(createInstructionImmediate(llvm::Intrinsic::riscv_vsll, x.value(), y, 4, 2));
 }
 
 }  // namespace riscv64
