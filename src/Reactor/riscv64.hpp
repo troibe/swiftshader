@@ -44,6 +44,14 @@ RValue<Int4> psrad(RValue<Int4> x, unsigned char y);
 RValue<UInt2> psrld(RValue<UInt2> x, unsigned char y);
 RValue<UInt4> psrld(RValue<UInt4> x, unsigned char y);
 
+RValue<Float> roundss(RValue<Float> val, unsigned char imm);
+RValue<Float> floorss(RValue<Float> val);
+RValue<Float> ceilss(RValue<Float> val);
+
+RValue<Float4> roundps(RValue<Float4> val, unsigned char imm);
+RValue<Float4> floorps(RValue<Float4> val);
+RValue<Float4> ceilps(RValue<Float4> val);
+
 RValue<Float> rcpss(RValue<Float> val);
 RValue<Float4> rcpps(RValue<Float4> val);
 

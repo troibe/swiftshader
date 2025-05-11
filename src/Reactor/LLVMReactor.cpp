@@ -1066,12 +1066,12 @@ void Nucleus::createMaskedStore(Value *ptr, Value *val, Value *mask, unsigned in
 	ASSERT(V(val)->getType()->isVectorTy());
 	ASSERT(V(mask)->getType()->isVectorTy());
 
-	auto numEls = llvm::cast<llvm::FixedVectorType>(V(mask)->getType())->getElementCount();
+	auto numEls = llvm::cast<llvm::FixedVectorType>(V(mask)->getType())->getNumElements();
 	auto i1Ty = llvm::Type::getInt1Ty(*jit->context);
 	auto i32Ty = llvm::Type::getInt32Ty(*jit->context);
 	auto elVecTy = V(val)->getType();
 	auto elVecPtrTy = elVecTy->getPointerTo();
-	auto i1Mask = jit->builder->CreateIntCast(V(mask), llvm::VectorType::get(i1Ty, numEls), false);  // vec<int, int, ...> -> vec<bool, bool, ...>
+	auto i1Mask = jit->builder->CreateIntCast(V(mask), llvm::VectorType::get(i1Ty, numEls, false), false);  // vec<int, int, ...> -> vec<bool, bool, ...>
 	auto align = llvm::ConstantInt::get(i32Ty, alignment);
 	auto func = llvm::Intrinsic::getDeclaration(jit->module.get(), llvm::Intrinsic::masked_store, { elVecTy, elVecPtrTy });
 	jit->builder->CreateCall(func, { V(val), V(ptr), align, i1Mask });
@@ -1087,8 +1087,7 @@ void Nucleus::createMaskedStore(Value *ptr, Value *val, Value *mask, unsigned in
 		auto func = jit->module->getOrInsertFunction("__msan_unpoison", funcTy);
 		auto size = jit->module->getDataLayout().getTypeStoreSize(llvm::cast<llvm::VectorType>(elVecTy)->getElementType());
 
-		bool scalable = llvm::cast<llvm::FixedVectorType>(V(mask)->getType())->isScalableTy();
-		for(size_t i = 0; llvm::ElementCount::get(i, scalable) != numEls; i++)
+		for(unsigned i = 0; i < numEls; i++)
 		{
 			// Check mask for this element
 			auto idx = llvm::ConstantInt::get(i32Ty, i);
@@ -1114,18 +1113,18 @@ static llvm::Value *createGather(llvm::Value *base, llvm::Type *elTy, llvm::Valu
 	ASSERT(offsets->getType()->isVectorTy());
 	ASSERT(mask->getType()->isVectorTy());
 
-	auto numEls = llvm::cast<llvm::FixedVectorType>(mask->getType())->getElementCount();
+	auto numEls = llvm::cast<llvm::FixedVectorType>(mask->getType())->getNumElements();
 	auto i1Ty = llvm::Type::getInt1Ty(*jit->context);
 	auto i32Ty = llvm::Type::getInt32Ty(*jit->context);
 	auto i8Ty = llvm::Type::getInt8Ty(*jit->context);
 	auto i8PtrTy = i8Ty->getPointerTo();
 	auto elPtrTy = elTy->getPointerTo();
-	auto elVecTy = llvm::VectorType::get(elTy, numEls);
-	auto elPtrVecTy = llvm::VectorType::get(elPtrTy, numEls);
+	auto elVecTy = llvm::VectorType::get(elTy, numEls, false);
+	auto elPtrVecTy = llvm::VectorType::get(elPtrTy, numEls, false);
 	auto i8Base = jit->builder->CreatePointerCast(base, i8PtrTy);
 	auto i8Ptrs = jit->builder->CreateGEP(i8Ty, i8Base, offsets);
 	auto elPtrs = jit->builder->CreatePointerCast(i8Ptrs, elPtrVecTy);
-	auto i1Mask = jit->builder->CreateIntCast(mask, llvm::VectorType::get(i1Ty, numEls), false);  // vec<int, int, ...> -> vec<bool, bool, ...>
+	auto i1Mask = jit->builder->CreateIntCast(mask, llvm::VectorType::get(i1Ty, numEls, false), false);  // vec<int, int, ...> -> vec<bool, bool, ...>
 	auto passthrough = zeroMaskedLanes ? llvm::Constant::getNullValue(elVecTy) : llvm::UndefValue::get(elVecTy);
 
 	if(!__has_feature(memory_sanitizer))
@@ -1143,8 +1142,7 @@ static llvm::Value *createGather(llvm::Value *base, llvm::Type *elTy, llvm::Valu
 		Value *result = Nucleus::allocateStackVariable(T(elVecTy));
 		Nucleus::createStore(V(passthrough), result, T(elVecTy));
 
-		bool scalable = llvm::cast<llvm::FixedVectorType>(mask->getType())->isScalableTy();
-		for(size_t i = 0; llvm::ElementCount::get(i, scalable) != numEls; i++)
+		for(unsigned i = 0; i < numEls; i++)
 		{
 			// Check mask for this element
 			Value *elementMask = Nucleus::createExtractElement(V(i1Mask), T(i1Ty), i);
@@ -1181,7 +1179,7 @@ static void createScatter(llvm::Value *base, llvm::Value *val, llvm::Value *offs
 	ASSERT(offsets->getType()->isVectorTy());
 	ASSERT(mask->getType()->isVectorTy());
 
-	auto numEls = llvm::cast<llvm::FixedVectorType>(mask->getType())->getElementCount();
+	auto numEls = llvm::cast<llvm::FixedVectorType>(mask->getType())->getNumElements();
 	auto i1Ty = llvm::Type::getInt1Ty(*jit->context);
 	auto i32Ty = llvm::Type::getInt32Ty(*jit->context);
 	auto i8Ty = llvm::Type::getInt8Ty(*jit->context);
@@ -1189,12 +1187,12 @@ static void createScatter(llvm::Value *base, llvm::Value *val, llvm::Value *offs
 	auto elVecTy = val->getType();
 	auto elTy = llvm::cast<llvm::VectorType>(elVecTy)->getElementType();
 	auto elPtrTy = elTy->getPointerTo();
-	auto elPtrVecTy = llvm::VectorType::get(elPtrTy, numEls);
+	auto elPtrVecTy = llvm::VectorType::get(elPtrTy, numEls, false);
 
 	auto i8Base = jit->builder->CreatePointerCast(base, i8PtrTy);
 	auto i8Ptrs = jit->builder->CreateGEP(i8Ty, i8Base, offsets);
 	auto elPtrs = jit->builder->CreatePointerCast(i8Ptrs, elPtrVecTy);
-	auto i1Mask = jit->builder->CreateIntCast(mask, llvm::VectorType::get(i1Ty, numEls), false);  // vec<int, int, ...> -> vec<bool, bool, ...>
+	auto i1Mask = jit->builder->CreateIntCast(mask, llvm::VectorType::get(i1Ty, numEls, false), false);  // vec<int, int, ...> -> vec<bool, bool, ...>
 
 	if(!__has_feature(memory_sanitizer))
 	{
@@ -1208,8 +1206,7 @@ static void createScatter(llvm::Value *base, llvm::Value *val, llvm::Value *offs
 		// Work around it by emulating scatter with element-wise stores.
 		// TODO(b/172238865): Remove when supported by MemorySanitizer.
 
-		bool scalable = llvm::cast<llvm::FixedVectorType>(mask->getType())->isScalableTy();
-		for(size_t i = 0; llvm::ElementCount::get(i, scalable) != numEls; i++)
+		for(unsigned i = 0; i < numEls; i++)
 		{
 			// Check mask for this element
 			auto idx = llvm::ConstantInt::get(i32Ty, i);
@@ -1631,13 +1628,12 @@ Value *Nucleus::createShuffleVector(Value *v1, Value *v2, std::vector<int> selec
 {
 	RR_DEBUG_INFO_UPDATE_LOC();
 
-	llvm::ElementCount size = llvm::cast<llvm::FixedVectorType>(V(v1)->getType())->getElementCount();
-	ASSERT(size == llvm::cast<llvm::FixedVectorType>(V(v2)->getType())->getElementCount());
+	size_t size = llvm::cast<llvm::FixedVectorType>(V(v1)->getType())->getNumElements();
+	ASSERT(size == llvm::cast<llvm::FixedVectorType>(V(v2)->getType())->getNumElements());
 
 	llvm::SmallVector<int, 16> mask;
 	const size_t selectSize = select.size();
-	bool scalable = llvm::cast<llvm::FixedVectorType>(V(v1)->getType())->isScalableTy();
-	for(size_t i = 0; llvm::ElementCount::get(i, scalable) != size; i++)
+	for(size_t i = 0; i < size; i++)
 	{
 		mask.push_back(select[i % selectSize]);
 	}
@@ -1776,12 +1772,11 @@ Value *Nucleus::createConstantVector(std::vector<int64_t> constants, Type *type)
 {
 	RR_DEBUG_INFO_UPDATE_LOC();
 	ASSERT(llvm::isa<llvm::VectorType>(T(type)));
-	const size_t numConstants = constants.size();                                                          // Number of provided constants for the (emulated) type.
-	const llvm::ElementCount numElements = llvm::cast<llvm::FixedVectorType>(T(type))->getElementCount();  // Number of elements of the underlying vector type.
+	const size_t numConstants = constants.size();                                             // Number of provided constants for the (emulated) type.
+	const size_t numElements = llvm::cast<llvm::FixedVectorType>(T(type))->getNumElements();  // Number of elements of the underlying vector type.
 	llvm::SmallVector<llvm::Constant *, 16> constantVector;
 
-	bool scalable = llvm::cast<llvm::FixedVectorType>(T(type))->isScalableTy();
-	for(size_t i = 0; llvm::ElementCount::get(i, scalable) != numElements; i++)
+	for(size_t i = 0; i < numElements; i++)
 	{
 		constantVector.push_back(llvm::ConstantInt::get(T(type)->getContainedType(0), constants[i % numConstants]));
 	}
@@ -1793,12 +1788,11 @@ Value *Nucleus::createConstantVector(std::vector<double> constants, Type *type)
 {
 	RR_DEBUG_INFO_UPDATE_LOC();
 	ASSERT(llvm::isa<llvm::VectorType>(T(type)));
-	const size_t numConstants = constants.size();                                                          // Number of provided constants for the (emulated) type.
-	const llvm::ElementCount numElements = llvm::cast<llvm::FixedVectorType>(T(type))->getElementCount();  // Number of elements of the underlying vector type.
+	const size_t numConstants = constants.size();                                             // Number of provided constants for the (emulated) type.
+	const size_t numElements = llvm::cast<llvm::FixedVectorType>(T(type))->getNumElements();  // Number of elements of the underlying vector type.
 	llvm::SmallVector<llvm::Constant *, 16> constantVector;
 
-	bool scalable = llvm::cast<llvm::FixedVectorType>(T(type))->isScalableTy();
-	for(size_t i = 0; llvm::ElementCount::get(i, scalable) != numElements; i++)
+	for(size_t i = 0; i < numElements; i++)
 	{
 		constantVector.push_back(llvm::ConstantFP::get(T(type)->getContainedType(0), constants[i % numConstants]));
 	}
@@ -3057,6 +3051,8 @@ RValue<Float> Round(RValue<Float> x)
 	{
 		return Float4(Round(Float4(x))).x;
 	}
+#elif defined(__riscv_vector)
+	return riscv64::roundss(x, 1);
 #else
 	return RValue<Float>(V(lowerRound(V(x.value()))));
 #endif
@@ -3074,6 +3070,8 @@ RValue<Float> Trunc(RValue<Float> x)
 	{
 		return Float(Int(x));  // Rounded toward zero
 	}
+#elif defined(__riscv_vector)
+	return riscv64::roundss(x, 0);
 #else
 	return RValue<Float>(V(lowerTrunc(V(x.value()))));
 #endif
@@ -3091,6 +3089,8 @@ RValue<Float> Frac(RValue<Float> x)
 	{
 		return Float4(Frac(Float4(x))).x;
 	}
+#elif defined(__riscv_vector)
+	return x - riscv64::floorss(x);
 #else
 	// x - floor(x) can be 1.0 for very small negative x.
 	// Clamp against the value just below 1.0.
@@ -3110,6 +3110,8 @@ RValue<Float> Floor(RValue<Float> x)
 	{
 		return Float4(Floor(Float4(x))).x;
 	}
+#elif defined(__riscv_vector)
+	return riscv64::floorss(x);
 #else
 	return RValue<Float>(V(lowerFloor(V(x.value()))));
 #endif
@@ -3124,6 +3126,8 @@ RValue<Float> Ceil(RValue<Float> x)
 		return x86::ceilss(x);
 	}
 	else
+#elif defined(__riscv_vector)
+	return riscv64::ceilss(x);
 #endif
 	{
 		return Float4(Ceil(Float4(x))).x;
@@ -3305,6 +3309,8 @@ RValue<Float4> Round(RValue<Float4> x)
 	{
 		return Float4(RoundInt(x));
 	}
+#elif defined(__riscv_vector)
+	return riscv64::roundps(x, 1);
 #else
 	return RValue<Float4>(V(lowerRound(V(x.value()))));
 #endif
@@ -3322,6 +3328,8 @@ RValue<Float4> Trunc(RValue<Float4> x)
 	{
 		return Float4(Int4(x));
 	}
+#elif defined(__riscv_vector)
+	return riscv64::roundps(x, 0);
 #else
 	return RValue<Float4>(V(lowerTrunc(V(x.value()))));
 #endif
@@ -3343,6 +3351,8 @@ RValue<Float4> Frac(RValue<Float4> x)
 
 		frc += As<Float4>(As<Int4>(CmpNLE(Float4(0.0f), frc)) & As<Int4>(Float4(1.0f)));  // Add 1.0 if negative.
 	}
+#elif defined(__riscv_vector)
+	frc = x - riscv64::floorps(x);
 #else
 	frc = x - Floor(x);
 #endif
@@ -3364,6 +3374,8 @@ RValue<Float4> Floor(RValue<Float4> x)
 	{
 		return x - Frac(x);
 	}
+#elif defined(__riscv_vector)
+	return riscv64::floorps(x);
 #else
 	return RValue<Float4>(V(lowerFloor(V(x.value()))));
 #endif
@@ -3378,6 +3390,8 @@ RValue<Float4> Ceil(RValue<Float4> x)
 		return x86::ceilps(x);
 	}
 	else
+#elif defined(__riscv_vector)
+	return riscv64::ceilps(x);
 #endif
 	{
 		return -Floor(-x);
@@ -3508,6 +3522,19 @@ namespace rr {
 
 #if defined(__riscv_vector)
 namespace riscv64 {
+
+static llvm::Value *setRoundingMode(llvm::Value *m)
+{
+	llvm::Function *FnSetRounding = llvm::Intrinsic::getDeclaration(jit->module.get(), llvm::Intrinsic::set_rounding, {});
+	return jit->builder->CreateCall(FnSetRounding->getFunctionType(), FnSetRounding, { m });
+}
+
+static llvm::Value *setRoundingMode(int mode)
+{
+	auto m = llvm::ConstantInt::get(*jit->context, llvm::APInt(32, mode));
+	return setRoundingMode(m);
+}
+
 static llvm::Value *vsetli(int size, int sew, int lmul)
 {
 	auto i = llvm::ConstantInt::get(*jit->context, llvm::APInt(64, size));
@@ -3517,7 +3544,7 @@ static llvm::Value *vsetli(int size, int sew, int lmul)
 	return jit->builder->CreateCall(FnVsetli->getFunctionType(), FnVsetli, { i, e, m });
 }
 
-static llvm::Value *createInstructionLLVM(llvm::Intrinsic::ID id, llvm::Type *returnType, int size, int sew, llvm::Value *X, llvm::Value *Y, llvm::Value *Z = nullptr)
+static llvm::Value *createInstructionLLVM(llvm::Intrinsic::ID id, llvm::Type *returnType, int size, int sew, llvm::Value *X, llvm::Value *Y = nullptr, llvm::Value *Z = nullptr)
 {
 	int lmul = ((8 << sew) * size) / CPUID::getVlen() >> 1;  // for example sew=1, size=8, VLENs -> 32: 2, 64: 1, 128: 0, <256: 0
 	llvm::Value *Vl = vsetli(size, sew, lmul);
@@ -3529,11 +3556,16 @@ static llvm::Value *createInstructionLLVM(llvm::Intrinsic::ID id, llvm::Type *re
 		llvm::Function *Fn = llvm::Intrinsic::getDeclaration(jit->module.get(), id, { R->getType(), X->getType(), Y->getType(), Z->getType(), Vl->getType() });
 		return jit->builder->CreateCall(Fn->getFunctionType(), Fn, { R, X, Y, Z, Vl });
 	}
-	llvm::Function *Fn = llvm::Intrinsic::getDeclaration(jit->module.get(), id, { R->getType(), X->getType(), Y->getType(), Vl->getType() });
-	return jit->builder->CreateCall(Fn->getFunctionType(), Fn, { R, X, Y, Vl });
+	if(Y)
+	{
+		llvm::Function *Fn = llvm::Intrinsic::getDeclaration(jit->module.get(), id, { R->getType(), X->getType(), Y->getType(), Vl->getType() });
+		return jit->builder->CreateCall(Fn->getFunctionType(), Fn, { R, X, Y, Vl });
+	}
+	llvm::Function *Fn = llvm::Intrinsic::getDeclaration(jit->module.get(), id, { R->getType(), X->getType(), Vl->getType() });
+	return jit->builder->CreateCall(Fn->getFunctionType(), Fn, { R, X, Vl });
 }
 
-static Value *createInstruction(llvm::Intrinsic::ID id, llvm::Type *returnType, int size, int sew, llvm::Value *X, llvm::Value *Y, llvm::Value *Z = nullptr)
+static Value *createInstruction(llvm::Intrinsic::ID id, llvm::Type *returnType, int size, int sew, llvm::Value *X, llvm::Value *Y = nullptr, llvm::Value *Z = nullptr)
 {
 	llvm::Value *R = createInstructionLLVM(id, returnType, size, sew, X, Y, Z);
 
@@ -3563,6 +3595,16 @@ static Value *createInstruction(llvm::Intrinsic::ID id, llvm::Type *type, int si
 	return createInstruction(id, type, size, sew, x, Y);
 }
 
+static Value *createInstruction(llvm::Intrinsic::ID id, llvm::Type *type, int size, int sew, Value *x, llvm::Type *returnType = nullptr)
+{
+	auto SVTy = llvm::ScalableVectorType::get(type, size);
+	auto Idx = llvm::ConstantInt::get(*jit->context, llvm::APInt(64, 0));
+	llvm::Value *X = llvm::PoisonValue::get(SVTy);
+	X = jit->builder->CreateInsertVector(SVTy, X, V(x), Idx);
+
+	return createInstruction(id, returnType ? returnType : type, size, sew, X);
+}
+
 static Value *createInstructionPack(llvm::Intrinsic::ID id, int size, int sew, bool u, Value *x, Value *y)
 {
 	auto SVTy = llvm::ScalableVectorType::get(llvm::IntegerType::get(*jit->context, 8 << sew), size * 2);
@@ -3580,10 +3622,8 @@ static Value *createInstructionPack(llvm::Intrinsic::ID id, int size, int sew, b
 		MR = createInstructionLLVM(llvm::Intrinsic::riscv_vmax, llvm::IntegerType::get(*jit->context, 8 << sew), size * 2, sew, X, Max);
 	}
 
-	// Value 0 taken from vnclipu.c
-	llvm::Value *RoundingMode = llvm::ConstantInt::get(*jit->context, llvm::APInt(64, 0));
 	llvm::Value *Shift = llvm::ConstantInt::get(*jit->context, llvm::APInt(64, 0));
-	return createInstruction(id, llvm::IntegerType::get(*jit->context, 8 << (sew - 1)), size * 2, sew - 1, u ? MR : X, Shift, RoundingMode);
+	return createInstruction(id, llvm::IntegerType::get(*jit->context, 8 << (sew - 1)), size * 2, sew - 1, u ? MR : X, Shift);
 }
 
 RValue<Short4> pmulhw(RValue<Short4> x, RValue<Short4> y)
@@ -3678,51 +3718,78 @@ RValue<Int4> pslld(RValue<Int4> x, unsigned char y)
 
 RValue<Int4> cvtps2dq(RValue<Float4> val)
 {
-	// Value 7 taken from vfadd.c
-	llvm::Value *RoundingMode = llvm::ConstantInt::get(*jit->context, llvm::APInt(64, 7));
-	return RValue<Int4>(createInstruction(llvm::Intrinsic::riscv_vfcvt_x_f_v, llvm::Type::getFloatTy(*jit->context), 4, 2, val.value(), RoundingMode, llvm::IntegerType::get(*jit->context, 32)));
+	return RValue<Int4>(createInstruction(llvm::Intrinsic::riscv_vfcvt_x_f_v, llvm::Type::getFloatTy(*jit->context), 4, 2, val.value(), llvm::IntegerType::get(*jit->context, 32)));
 }
 
 RValue<Int> cvtss2si(RValue<Float> val)
 {
 	Value *vector = Nucleus::createInsertElement(V(llvm::UndefValue::get(T(Float4::type()))), val.value(), 0);
 
-	// Value 7 taken from vfadd.c
-	llvm::Value *RoundingMode = llvm::ConstantInt::get(*jit->context, llvm::APInt(64, 7));
-	Value *instruction = createInstruction(llvm::Intrinsic::riscv_vfcvt_x_f_v, llvm::Type::getFloatTy(*jit->context), 4, 2, vector, RoundingMode, llvm::IntegerType::get(*jit->context, 32));
+	Value *instruction = createInstruction(llvm::Intrinsic::riscv_vfcvt_x_f_v, llvm::Type::getFloatTy(*jit->context), 4, 2, vector, llvm::IntegerType::get(*jit->context, 32));
 	return RValue<Int>(Nucleus::createExtractElement(instruction, Int::type(), 0));
 }
 
 RValue<Float4> rsqrtps(RValue<Float4> val)
 {
-	// Value 7 taken from vfrec7.c
-	llvm::Value *RoundingMode = llvm::ConstantInt::get(*jit->context, llvm::APInt(64, 7));
-	return RValue<Float4>(createInstruction(llvm::Intrinsic::riscv_vfrsqrt7, llvm::Type::getFloatTy(*jit->context), 4, 2, val.value(), RoundingMode));
+	return RValue<Float4>(createInstruction(llvm::Intrinsic::riscv_vfrsqrt7, llvm::Type::getFloatTy(*jit->context), 4, 2, val.value()));
 }
 
 RValue<Float> rsqrtss(RValue<Float> val)
 {
 	Value *vector = Nucleus::createInsertElement(V(llvm::UndefValue::get(T(Float4::type()))), val.value(), 0);
 
-	// Value 7 taken from vfrec7.c
-	llvm::Value *RoundingMode = llvm::ConstantInt::get(*jit->context, llvm::APInt(64, 7));
-	return RValue<Float>(Nucleus::createExtractElement(createInstruction(llvm::Intrinsic::riscv_vfrsqrt7, llvm::Type::getFloatTy(*jit->context), 4, 2, vector, RoundingMode), Float::type(), 0));
+	return RValue<Float>(Nucleus::createExtractElement(createInstruction(llvm::Intrinsic::riscv_vfrsqrt7, llvm::Type::getFloatTy(*jit->context), 4, 2, vector), Float::type(), 0));
+}
+
+RValue<Float> roundss(RValue<Float> val, unsigned char imm)
+{
+	setRoundingMode(imm);
+
+	Value *vector = Nucleus::createInsertElement(V(llvm::UndefValue::get(T(Float4::type()))), val.value(), 0);
+
+	Value *instructionI = createInstruction(llvm::Intrinsic::riscv_vfcvt_x_f_v, llvm::Type::getFloatTy(*jit->context), 4, 2, vector, llvm::IntegerType::get(*jit->context, 32));
+	Value *instructionF = createInstruction(llvm::Intrinsic::riscv_vfcvt_f_x_v, llvm::IntegerType::get(*jit->context, 32), 4, 2, instructionI, llvm::Type::getFloatTy(*jit->context));
+	return RValue<Float>(Nucleus::createExtractElement(instructionF, Float::type(), 0));
+}
+
+RValue<Float> floorss(RValue<Float> val)
+{
+	return roundss(val, 3);
+}
+
+RValue<Float> ceilss(RValue<Float> val)
+{
+	return roundss(val, 2);
+}
+
+RValue<Float4> roundps(RValue<Float4> val, unsigned char imm)
+{
+	setRoundingMode(imm);
+	Value *instructionI = createInstruction(llvm::Intrinsic::riscv_vfcvt_x_f_v, llvm::Type::getFloatTy(*jit->context), 4, 2, val.value(), llvm::IntegerType::get(*jit->context, 32));
+	Value *instructionF = createInstruction(llvm::Intrinsic::riscv_vfcvt_f_x_v, llvm::IntegerType::get(*jit->context, 32), 4, 2, instructionI, llvm::Type::getFloatTy(*jit->context));
+	return RValue<Float4>(instructionF);
+}
+
+RValue<Float4> floorps(RValue<Float4> val)
+{
+	return roundps(val, 3);
+}
+
+RValue<Float4> ceilps(RValue<Float4> val)
+{
+	return roundps(val, 2);
 }
 
 RValue<Float> rcpss(RValue<Float> val)
 {
 	Value *vector = Nucleus::createInsertElement(V(llvm::UndefValue::get(T(Float4::type()))), val.value(), 0);
 
-	// Value 7 taken from vfrec7.c
-	llvm::Value *RoundingMode = llvm::ConstantInt::get(*jit->context, llvm::APInt(64, 7));
-	return RValue<Float>(Nucleus::createExtractElement(createInstruction(llvm::Intrinsic::riscv_vfrec7, llvm::Type::getFloatTy(*jit->context), 4, 2, vector, RoundingMode), Float::type(), 0));
+	return RValue<Float>(Nucleus::createExtractElement(createInstruction(llvm::Intrinsic::riscv_vfrec7, llvm::Type::getFloatTy(*jit->context), 4, 2, vector), Float::type(), 0));
 }
 
 RValue<Float4> rcpps(RValue<Float4> val)
 {
-	// Value 7 taken from vfrec7.c
-	llvm::Value *RoundingMode = llvm::ConstantInt::get(*jit->context, llvm::APInt(64, 7));
-	return RValue<Float4>(createInstruction(llvm::Intrinsic::riscv_vfrec7, llvm::Type::getFloatTy(*jit->context), 4, 2, val.value(), RoundingMode));
+	return RValue<Float4>(createInstruction(llvm::Intrinsic::riscv_vfrec7, llvm::Type::getFloatTy(*jit->context), 4, 2, val.value()));
 }
 
 RValue<Short4> packssdw(RValue<Int2> x, RValue<Int2> y)

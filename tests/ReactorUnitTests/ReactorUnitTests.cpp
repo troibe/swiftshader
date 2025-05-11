@@ -1543,6 +1543,178 @@ TEST(ReactorUnitTests, RoundInt)
 	EXPECT_EQ(out[2][3], -4);
 }
 
+TEST(ReactorUnitTests, Floor)
+{
+	FunctionT<int(void *)> function;
+	{
+		Pointer<Byte> out = function.Arg<0>();
+
+		*Pointer<Float4>(out + 0) = Floor(Float4(3.1f, 3.6f, -3.1f, -3.6f));
+		*Pointer<Float4>(out + 16) = Floor(Float4(2147483648.0f, -2147483648.0f, 2147483520, -2147483520));
+		*Pointer<Float>(out + 32) = Floor(Float(3.1f));
+		*Pointer<Float>(out + 36) = Floor(Float(3.6f));
+		*Pointer<Float>(out + 40) = Floor(Float(-3.1f));
+		*Pointer<Float>(out + 44) = Floor(Float(-3.6f));
+
+		Return(0);
+	}
+
+	auto routine = function(testName().c_str());
+
+	float out[3][4];
+
+	memset(&out, 0, sizeof(out));
+
+	routine(&out);
+
+	EXPECT_EQ(out[0][0], 3.0f);
+	EXPECT_EQ(out[0][1], 3.0f);
+	EXPECT_EQ(out[0][2], -4.0f);
+	EXPECT_EQ(out[0][3], -4.0f);
+
+	// x86 returns 0x80000000 for values which cannot be represented in a 32-bit
+	// integer, but RoundIntClamped() clamps to ensure a positive value for
+	// positive input. ARM saturates to the largest representable integers.
+	EXPECT_GE(out[1][0], 2147483520);
+	EXPECT_LE(out[1][1], -2147483647);
+	EXPECT_EQ(out[1][2], 2147483520);
+	EXPECT_EQ(out[1][3], -2147483520);
+
+	EXPECT_EQ(out[2][0], 3.0f);
+	EXPECT_EQ(out[2][1], 3.0f);
+	EXPECT_EQ(out[2][2], -4.0f);
+	EXPECT_EQ(out[2][3], -4.0f);
+}
+
+TEST(ReactorUnitTests, Ceil)
+{
+	FunctionT<int(void *)> function;
+	{
+		Pointer<Byte> out = function.Arg<0>();
+
+		*Pointer<Float4>(out + 0) = Ceil(Float4(3.1f, 3.6f, -3.1f, -3.6f));
+		*Pointer<Float4>(out + 16) = Ceil(Float4(2147483648.0f, -2147483648.0f, 2147483520, -2147483520));
+		*Pointer<Float>(out + 32) = Ceil(Float(3.1f));
+		*Pointer<Float>(out + 36) = Ceil(Float(3.6f));
+		*Pointer<Float>(out + 40) = Ceil(Float(-3.1f));
+		*Pointer<Float>(out + 44) = Ceil(Float(-3.6f));
+
+		Return(0);
+	}
+
+	auto routine = function(testName().c_str());
+
+	float out[3][4];
+
+	memset(&out, 0, sizeof(out));
+
+	routine(&out);
+
+	EXPECT_EQ(out[0][0], 4.0f);
+	EXPECT_EQ(out[0][1], 4.0f);
+	EXPECT_EQ(out[0][2], -3.0f);
+	EXPECT_EQ(out[0][3], -3.0f);
+
+	// x86 returns 0x80000000 for values which cannot be represented in a 32-bit
+	// integer, but RoundIntClamped() clamps to ensure a positive value for
+	// positive input. ARM saturates to the largest representable integers.
+	EXPECT_GE(out[1][0], 2147483520.0f);
+	EXPECT_LE(out[1][1], -2147483647.0f);
+	EXPECT_EQ(out[1][2], 2147483520.0f);
+	EXPECT_EQ(out[1][3], -2147483520.0f);
+
+	EXPECT_EQ(out[2][0], 4.0f);
+	EXPECT_EQ(out[2][1], 4.0f);
+	EXPECT_EQ(out[2][2], -3.0f);
+	EXPECT_EQ(out[2][3], -3.0f);
+}
+
+TEST(ReactorUnitTests, Trunc)
+{
+	FunctionT<int(void *)> function;
+	{
+		Pointer<Byte> out = function.Arg<0>();
+
+		*Pointer<Float4>(out + 0) = Trunc(Float4(3.1f, 3.6f, -3.1f, -3.6f));
+		*Pointer<Float4>(out + 16) = Trunc(Float4(2147483648.0f, -2147483648.0f, 2147483520, -2147483520));
+		*Pointer<Float>(out + 32) = Trunc(Float(3.1f));
+		*Pointer<Float>(out + 36) = Trunc(Float(3.6f));
+		*Pointer<Float>(out + 40) = Trunc(Float(-3.1f));
+		*Pointer<Float>(out + 44) = Trunc(Float(-3.6f));
+
+		Return(0);
+	}
+
+	auto routine = function(testName().c_str());
+
+	float out[3][4];
+
+	memset(&out, 0, sizeof(out));
+
+	routine(&out);
+
+	EXPECT_EQ(out[0][0], 3.0f);
+	EXPECT_EQ(out[0][1], 3.0f);
+	EXPECT_EQ(out[0][2], -3.0f);
+	EXPECT_EQ(out[0][3], -3.0f);
+
+	// x86 returns 0x80000000 for values which cannot be represented in a 32-bit
+	// integer, but RoundIntClamped() clamps to ensure a positive value for
+	// positive input. ARM saturates to the largest representable integers.
+	EXPECT_GE(out[1][0], 2147483520.0f);
+	EXPECT_LE(out[1][1], -2147483647.0f);
+	EXPECT_EQ(out[1][2], 2147483520.0f);
+	EXPECT_EQ(out[1][3], -2147483520.0f);
+
+	EXPECT_EQ(out[2][0], 3.0f);
+	EXPECT_EQ(out[2][1], 3.0f);
+	EXPECT_EQ(out[2][2], -3.0f);
+	EXPECT_EQ(out[2][3], -3.0f);
+}
+
+TEST(ReactorUnitTests, Round)
+{
+	FunctionT<int(void *)> function;
+	{
+		Pointer<Byte> out = function.Arg<0>();
+
+		*Pointer<Float4>(out + 0) = Round(Float4(3.1f, 3.6f, -3.1f, -3.6f));
+		*Pointer<Float4>(out + 16) = Round(Float4(2147483648.0f, -2147483648.0f, 2147483520, -2147483520));
+		*Pointer<Float>(out + 32) = Round(Float(3.1f));
+		*Pointer<Float>(out + 36) = Round(Float(3.6f));
+		*Pointer<Float>(out + 40) = Round(Float(-3.1f));
+		*Pointer<Float>(out + 44) = Round(Float(-3.6f));
+
+		Return(0);
+	}
+
+	auto routine = function(testName().c_str());
+
+	float out[3][4];
+
+	memset(&out, 0, sizeof(out));
+
+	routine(&out);
+
+	EXPECT_EQ(out[0][0], 3.0f);
+	EXPECT_EQ(out[0][1], 4.0f);
+	EXPECT_EQ(out[0][2], -3.0f);
+	EXPECT_EQ(out[0][3], -4.0f);
+
+	// x86 returns 0x80000000 for values which cannot be represented in a 32-bit
+	// integer, but RoundIntClamped() clamps to ensure a positive value for
+	// positive input. ARM saturates to the largest representable integers.
+	EXPECT_GE(out[1][0], 2147483520.0f);
+	EXPECT_LE(out[1][1], -2147483647.0f);
+	EXPECT_EQ(out[1][2], 2147483520.0f);
+	EXPECT_EQ(out[1][3], -2147483520.0f);
+
+	EXPECT_EQ(out[2][0], 3.0f);
+	EXPECT_EQ(out[2][1], 4.0f);
+	EXPECT_EQ(out[2][2], -3.0f);
+	EXPECT_EQ(out[2][3], -4.0f);
+}
+
 TEST(ReactorUnitTests, FPtoUI)
 {
 	FunctionT<int(void *)> function;
