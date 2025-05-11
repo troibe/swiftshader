@@ -2101,6 +2101,8 @@ RValue<Int2> MulAdd(RValue<Short4> x, RValue<Short4> y)
 	RR_DEBUG_INFO_UPDATE_LOC();
 #if defined(__i386__) || defined(__x86_64__)
 	return x86::pmaddwd(x, y);
+#elif defined(__riscv_vector)
+	return riscv64::pmaddwd(x, y);
 #else
 	return As<Int2>(V(lowerMulAdd(V(x.value()), V(y.value()))));
 #endif
@@ -2307,6 +2309,8 @@ RValue<Int4> MulAdd(RValue<Short8> x, RValue<Short8> y)
 	RR_DEBUG_INFO_UPDATE_LOC();
 #if defined(__i386__) || defined(__x86_64__)
 	return x86::pmaddwd(x, y);
+#elif defined(__riscv_vector)
+	return riscv64::pmaddwd(x, y);
 #else
 	return As<Int4>(V(lowerMulAdd(V(x.value()), V(y.value()))));
 #endif
@@ -3611,14 +3615,14 @@ static Value *createInstruction(llvm::Intrinsic::ID id, llvm::Type *type, int si
 	return createInstruction(id, returnType ? returnType : type, size, sew, X, Y);
 }
 
-static Value *createInstruction(llvm::Intrinsic::ID id, llvm::Type *type, int size, int sew, Value *x, Value *y)
+static Value *createInstruction(llvm::Intrinsic::ID id, llvm::Type *type, int size, int sew, Value *x, Value *y, llvm::Type *returnType = nullptr)
 {
 	auto SVTy = llvm::ScalableVectorType::get(type, size);
 	auto Idx = llvm::ConstantInt::get(*jit->context, llvm::APInt(64, 0));
 	llvm::Value *Y = llvm::PoisonValue::get(SVTy);
 	Y = jit->builder->CreateInsertVector(SVTy, Y, V(y), Idx);
 
-	return createInstruction(id, type, size, sew, x, Y);
+	return createInstruction(id, type, size, sew, x, Y, returnType);
 }
 
 static Value *createInstruction(llvm::Intrinsic::ID id, llvm::Type *type, int size, int sew, Value *x, llvm::Type *returnType = nullptr)
@@ -3700,6 +3704,43 @@ RValue<UShort4> pmulhuw(RValue<UShort4> x, RValue<UShort4> y)
 RValue<UShort8> pmulhuw(RValue<UShort8> x, RValue<UShort8> y)
 {
 	return RValue<UShort8>(createInstruction(llvm::Intrinsic::riscv_vmulhu, llvm::IntegerType::get(*jit->context, 16), 8, 1, x.value(), y.value()));
+}
+
+Value *mulAdd(Value *x, Value *y, int size, int sew)
+{
+	Value *wMul = createInstruction(llvm::Intrinsic::riscv_vwmul, llvm::IntegerType::get(*jit->context, 8 << sew), size, 1, x, y, llvm::IntegerType::get(*jit->context, 32));
+
+	llvm::Type *maskIntType = llvm::IntegerType::get(*jit->context, 1);
+	llvm::Type *intType = llvm::IntegerType::get(*jit->context, 8 << (sew + 1));
+	std::vector<int64_t> evenMaskValues = { 1, 0, 1, 0 };
+	Value *evenMask = Nucleus::createConstantVector(evenMaskValues, T(llvm::VectorType::get(maskIntType, size, false)));
+
+	auto SVTy = llvm::ScalableVectorType::get(maskIntType, size);
+	auto Idx = llvm::ConstantInt::get(*jit->context, llvm::APInt(64, 0));
+	llvm::Value *EvenMask = llvm::PoisonValue::get(SVTy);
+	EvenMask = jit->builder->CreateInsertVector(SVTy, EvenMask, V(evenMask), Idx);
+
+	Value *wMulEven = createInstruction(llvm::Intrinsic::riscv_vcompress, intType, size, sew + 1, wMul, EvenMask);
+
+	std::vector<int64_t> oddMaskValues = { 0, 1, 0, 1 };
+	Value *oddMask = Nucleus::createConstantVector(oddMaskValues, T(llvm::VectorType::get(maskIntType, size, false)));
+
+	llvm::Value *OddMask = llvm::PoisonValue::get(SVTy);
+	OddMask = jit->builder->CreateInsertVector(SVTy, OddMask, V(oddMask), Idx);
+
+	Value *wMulOdd = createInstruction(llvm::Intrinsic::riscv_vcompress, intType, size, sew + 1, wMul, OddMask);
+
+	return createInstruction(llvm::Intrinsic::riscv_vadd, intType, size / 2, 1, wMulEven, wMulOdd);
+}
+
+RValue<Int2> pmaddwd(RValue<Short4> x, RValue<Short4> y)
+{
+	return RValue<Int2>(mulAdd(x.value(), y.value(), 4, 1));
+}
+
+RValue<Int4> pmaddwd(RValue<Short8> x, RValue<Short8> y)
+{
+	return RValue<Int4>(mulAdd(x.value(), y.value(), 8, 1));
 }
 
 RValue<Float4> maxps(RValue<Float4> x, RValue<Float4> y)

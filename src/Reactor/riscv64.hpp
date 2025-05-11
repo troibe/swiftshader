@@ -31,6 +31,9 @@ RValue<UShort4> pmulhuw(RValue<UShort4> x, RValue<UShort4> y);
 RValue<Short8> pmulhw(RValue<Short8> x, RValue<Short8> y);
 RValue<UShort8> pmulhuw(RValue<UShort8> x, RValue<UShort8> y);
 
+RValue<Int2> pmaddwd(RValue<Short4> x, RValue<Short4> y);
+RValue<Int4> pmaddwd(RValue<Short8> x, RValue<Short8> y);
+
 RValue<UShort4> psrlw(RValue<UShort4> x, unsigned char y);
 RValue<UShort8> psrlw(RValue<UShort8> x, unsigned char y);
 RValue<Short4> psraw(RValue<Short4> x, unsigned char y);

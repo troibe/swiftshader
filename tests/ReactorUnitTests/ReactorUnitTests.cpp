@@ -2292,17 +2292,19 @@ TEST(ReactorUnitTests, MulAdd)
 	{
 		Pointer<Byte> out = function.Arg<0>();
 
-		*Pointer<Int2>(out + 8 * 0) =
+		*Pointer<Int2>(out + 4 * 0) =
 		    MulAdd(Short4(0x1aa, 0x2dd, 0x3ee, 0xF422),
 		           Short4(0x1bb, 0x2cc, 0x3ff, 0xF411));
+		*Pointer<Int4>(out + 4 * 4) =
+		    MulAdd(Short8(0x1aa, 0x2dd, 0x3ee, 0xF422, 0x1aa, 0x2dd, 0x3ee, 0xF422),
+		           Short8(0x1bb, 0x2cc, 0x3ff, 0xF411, 0x1bb, 0x2cc, 0x3ff, 0xF411));
 
-		// (U)Short8 variant is mentioned but unimplemented
 		Return(0);
 	}
 
 	auto routine = function(testName().c_str());
 
-	unsigned int out[1][2];
+	unsigned int out[2][4];
 
 	memset(&out, 0, sizeof(out));
 
@@ -2310,6 +2312,11 @@ TEST(ReactorUnitTests, MulAdd)
 
 	EXPECT_EQ(out[0][0], 0x000AE34Au);
 	EXPECT_EQ(out[0][1], 0x009D5254u);
+
+	EXPECT_EQ(out[1][0], 0x000AE34Au);
+	EXPECT_EQ(out[1][1], 0x009D5254u);
+	EXPECT_EQ(out[1][2], 0x000AE34Au);
+	EXPECT_EQ(out[1][3], 0x009D5254u);
 }
 
 TEST(ReactorUnitTests, PointersEqual)
