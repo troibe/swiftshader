@@ -52,6 +52,9 @@ RValue<Float4> roundps(RValue<Float4> val, unsigned char imm);
 RValue<Float4> floorps(RValue<Float4> val);
 RValue<Float4> ceilps(RValue<Float4> val);
 
+RValue<Int> movmskps(RValue<Int4> x);
+RValue<Int> pmovmskb(RValue<SByte8> x);
+
 RValue<Float> rcpss(RValue<Float> val);
 RValue<Float4> rcpps(RValue<Float4> val);
 

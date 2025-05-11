@@ -1715,6 +1715,34 @@ TEST(ReactorUnitTests, Round)
 	EXPECT_EQ(out[2][3], -4.0f);
 }
 
+TEST(ReactorUnitTests, SignMask)
+{
+	FunctionT<int(void *)> function;
+	{
+		Pointer<Byte> out = function.Arg<0>();
+
+		*Pointer<Int>(out + 0) = SignMask(Float4(0.0f, 1.0f, -0.0f, -1.0f));
+		*Pointer<Int>(out + 4) = SignMask(Int4(0, 1, -1, -2));
+		*Pointer<Int>(out + 8) = SignMask(Byte8(0, 1, 2, 3, 0x80, 0x81, 0x8f, 0xff));
+		*Pointer<Int>(out + 12) = SignMask(SByte8(0, 1, 2, 3, -1, -2, -3, -4));
+
+		Return(0);
+	}
+
+	auto routine = function(testName().c_str());
+
+	int out[4];
+
+	memset(&out, 0, sizeof(out));
+
+	routine(&out);
+
+	EXPECT_EQ(out[0], 0b1100);
+	EXPECT_EQ(out[1], 0b1100);
+	EXPECT_EQ(out[2], 0xf0);
+	EXPECT_EQ(out[3], 0xf0);
+}
+
 TEST(ReactorUnitTests, FPtoUI)
 {
 	FunctionT<int(void *)> function;

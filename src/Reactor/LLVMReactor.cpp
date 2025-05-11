@@ -1878,6 +1878,8 @@ RValue<Int> SignMask(RValue<Byte8> x)
 	RR_DEBUG_INFO_UPDATE_LOC();
 #if defined(__i386__) || defined(__x86_64__)
 	return x86::pmovmskb(x);
+#elif defined(__riscv_vector)
+	return riscv64::pmovmskb(As<SByte8>(x));
 #else
 	return As<Int>(V(lowerSignMask(V(x.value()), T(Int::type()))));
 #endif
@@ -1932,6 +1934,8 @@ RValue<Int> SignMask(RValue<SByte8> x)
 	RR_DEBUG_INFO_UPDATE_LOC();
 #if defined(__i386__) || defined(__x86_64__)
 	return x86::pmovmskb(As<Byte8>(x));
+#elif defined(__riscv_vector)
+	return riscv64::pmovmskb(x);
 #else
 	return As<Int>(V(lowerSignMask(V(x.value()), T(Int::type()))));
 #endif
@@ -2812,6 +2816,8 @@ RValue<Int> SignMask(RValue<Int4> x)
 	RR_DEBUG_INFO_UPDATE_LOC();
 #if defined(__i386__) || defined(__x86_64__)
 	return x86::movmskps(As<Float4>(x));
+#elif defined(__riscv_vector)
+	return riscv64::movmskps(x);
 #else
 	return As<Int>(V(lowerSignMask(V(x.value()), T(Int::type()))));
 #endif
@@ -3214,6 +3220,8 @@ RValue<Int> SignMask(RValue<Float4> x)
 	RR_DEBUG_INFO_UPDATE_LOC();
 #if defined(__i386__) || defined(__x86_64__)
 	return x86::movmskps(x);
+#elif defined(__riscv_vector)
+	return riscv64::movmskps(As<Int4>(x));
 #else
 	return As<Int>(V(lowerFPSignMask(V(x.value()), T(Int::type()))));
 #endif
@@ -3522,17 +3530,11 @@ namespace rr {
 
 #if defined(__riscv_vector)
 namespace riscv64 {
-
-static llvm::Value *setRoundingMode(llvm::Value *m)
-{
-	llvm::Function *FnSetRounding = llvm::Intrinsic::getDeclaration(jit->module.get(), llvm::Intrinsic::set_rounding, {});
-	return jit->builder->CreateCall(FnSetRounding->getFunctionType(), FnSetRounding, { m });
-}
-
 static llvm::Value *setRoundingMode(int mode)
 {
 	auto m = llvm::ConstantInt::get(*jit->context, llvm::APInt(32, mode));
-	return setRoundingMode(m);
+	llvm::Function *FnSetRounding = llvm::Intrinsic::getDeclaration(jit->module.get(), llvm::Intrinsic::set_rounding, {});
+	return jit->builder->CreateCall(FnSetRounding->getFunctionType(), FnSetRounding, { m });
 }
 
 static llvm::Value *vsetli(int size, int sew, int lmul)
@@ -3563,6 +3565,30 @@ static llvm::Value *createInstructionLLVM(llvm::Intrinsic::ID id, llvm::Type *re
 	}
 	llvm::Function *Fn = llvm::Intrinsic::getDeclaration(jit->module.get(), id, { R->getType(), X->getType(), Vl->getType() });
 	return jit->builder->CreateCall(Fn->getFunctionType(), Fn, { R, X, Vl });
+}
+
+static Value *createRedInstruction(llvm::Intrinsic::ID id, llvm::Type *returnType, int size, int scalarSize, int sew, Value *X, Value *Y)
+{
+	llvm::Type *intType = llvm::IntegerType::get(*jit->context, 8 << sew);
+	auto VTy = llvm::FixedVectorType::get(intType, scalarSize);
+	auto SVTy = llvm::ScalableVectorType::get(intType, size);
+	auto Idx = llvm::ConstantInt::get(*jit->context, llvm::APInt(64, 0));
+	llvm::Value *Ve = llvm::PoisonValue::get(SVTy);
+	Ve = jit->builder->CreateInsertVector(SVTy, Ve, V(X), Idx);
+
+	auto RSVTy = llvm::ScalableVectorType::get(intType, scalarSize);
+	llvm::Value *S = llvm::PoisonValue::get(RSVTy);
+	S = jit->builder->CreateInsertVector(RSVTy, S, V(Y), Idx);
+
+	int lmul = ((8 << sew) * size) / CPUID::getVlen() >> 1;  // for example sew=1, size=8, VLENs -> 32: 2, 64: 1, 128: 0, <256: 0
+	llvm::Value *Vl = vsetli(size, sew, lmul);
+
+	// CHECK-RV64-NEXT:    [[TMP0:%.*]] = call <vscale x 8 x i8> @llvm.riscv.vredop.nxv8i8.nxv2i8.i64(<vscale x 8 x i8> poison, <vscale x 2 x i8> [[VECTOR]], <vscale x 8 x i8> [[SCALAR]], i64 [[VL]])
+	llvm::Function *FnVsetli = llvm::Intrinsic::getDeclaration(jit->module.get(), id, { S->getType(), Ve->getType(), S->getType(), Vl->getType() });
+
+	S = jit->builder->CreateCall(FnVsetli->getFunctionType(), FnVsetli, { S, Ve, S, Vl });
+
+	return V(jit->builder->CreateExtractVector(VTy, S, Idx));
 }
 
 static Value *createInstruction(llvm::Intrinsic::ID id, llvm::Type *returnType, int size, int sew, llvm::Value *X, llvm::Value *Y = nullptr, llvm::Value *Z = nullptr)
@@ -3634,6 +3660,36 @@ RValue<Short4> pmulhw(RValue<Short4> x, RValue<Short4> y)
 RValue<Short8> pmulhw(RValue<Short8> x, RValue<Short8> y)
 {
 	return RValue<Short8>(createInstruction(llvm::Intrinsic::riscv_vmulh, llvm::IntegerType::get(*jit->context, 16), 8, 1, x.value(), y.value()));
+}
+
+RValue<Int> movemask(Value *x, int size, int sew)
+{
+	llvm::Type *intType = llvm::IntegerType::get(*jit->context, 8 << sew);
+	Value *shiftedX = createInstruction(llvm::Intrinsic::riscv_vsra, intType, size, sew, x, llvm::ConstantInt::get(*jit->context, llvm::APInt(64, (8 << sew) - 1)));
+
+	std::vector<int64_t> maskValues = { 1, 2, 4, 8, 16, 32, 64, 128 };
+	Value *mask = Nucleus::createConstantVector(maskValues, T(llvm::VectorType::get(intType, size, false)));
+
+	Value *maskedX = createInstruction(llvm::Intrinsic::riscv_vand, intType, size, sew, shiftedX, mask);
+
+	int scalarSize = 64 / (8 << sew);
+	auto VTy = llvm::FixedVectorType::get(intType, scalarSize);
+	std::vector<int64_t> zeroValues(scalarSize, 0);
+	Value *zeroVector = Nucleus::createConstantVector(zeroValues, T(VTy));
+
+	Value *movemaskX = createRedInstruction(llvm::Intrinsic::riscv_vredor, intType, size, scalarSize, sew, maskedX, zeroVector);
+
+	return RValue<Int>(Nucleus::createExtractElement(movemaskX, T(VTy), 0));
+}
+
+RValue<Int> movmskps(RValue<Int4> x)
+{
+	return movemask(x.value(), 4, 2);
+}
+
+RValue<Int> pmovmskb(RValue<SByte8> x)
+{
+	return movemask(x.value(), 8, 0);
 }
 
 RValue<UShort4> pmulhuw(RValue<UShort4> x, RValue<UShort4> y)
